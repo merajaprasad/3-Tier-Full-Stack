@@ -1,0 +1,34 @@
+{
+    "family": "yelp-camp-app",
+    "taskRoleArn": "",
+    "executionRoleArn": "arn:aws:iam::1234567890:role/ecsTaskExecutionRole",
+    "containerDefinitions": [
+        {
+            "name": "yelp-camp-app-container",
+            "image": "1234567890.dkr.ecr.us-east-1.amazonaws.com/yelp-camp-app:tag",
+            "essential": true,
+            "portMappings": [
+                {
+                    "name": "yelp-camp-app-3000-tcp",
+                    "containerPort": 5000,
+                    "hostPort": 0,
+                    "protocol": "tcp"
+                    
+                }
+            ],
+            "healthCheck": {
+                "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+                "interval": 30,
+                "timeout": 5,
+                "retries": 3,
+                "startPeriod": 40
+            }
+        }
+    ],
+    "requiresCompatibilities": ["EC2"],
+    "cpu": "500",
+    "memory": "1000",
+    "pidMode": "task",
+    "ipcMode": "task"
+}
+
