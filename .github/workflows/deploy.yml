@@ -1,0 +1,236 @@
+name: Deploy to Amazon ECS
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+  
+  pull_request:
+    branches: ['dev']
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+
+env:
+  AWS_DEFAULT_REGION: "us-east-1"
+  REGION: "us-east-1"
+  ECR_REPO: "yelp-camp-app"
+  ACCOUNT_ID: "00000000"
+  TASK_DEFINATION_FAMILY: "yelp-camp-app"
+  ECS_CONTAINER_NAME: "yelp-camp-app-container"
+  IMAGE_TAG: ${{ github.sha }}
+
+  CLUSTER: "demo-ecs-cluster"
+  SERVICE: "yelp-camp-app-service"
+
+  VPC_ID: "vpc-1234567890"
+  TARGET_GROUP_NAME: "yelp-camp-app-tg"
+  HEALTH_CHECK_PATH_TG: "/health"
+  ALB_LISTENER_ARN: "arn:aws:elasticloadbalancing:ap-south-1:171916487674:listener/app/cbd-alb/5c5286ae1f12e91c/fb5659f3a4eda5fa"
+  HOST: "yelp-camp.momoji.store"
+
+
+  INFISICAL_ENV: 'dev'
+  INFISICAL_API_URL: ${{ secrets.INFISICAL_GASAPP_API_URL }}
+  INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_GASAPP_API_CLIENT_ID }}
+  INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_GASAPP_API_CLIENT_SECRET }}
+  INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_GASAPP_API_PROJECT_ID }}
+
+
+  AWS_SDK_LOAD_CONFIG: '1'
+
+
+# allows GitHub Actions to read the repository content
+permissions:
+  contents: read
+
+jobs:
+# Job-1   For Each Job we need to add Runner
+  checkout:
+    name: Checkout Git Repo
+    runs-on: self-hosted
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@4
+
+# job-2  For Each Job we need to add Runner
+  deploy:
+    name: Deploy
+    runs-on: self-hosted
+    environment: development
+    needs: [checkout]
+    if: github.event_name == 'push'
+
+    steps: # Steps are the tasks that are performed in the job
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and Push Docker Image
+        id: build-image
+        run: |
+          # Get Infisical token
+          INFISICAL_TOKEN=$(infisical login --method=universal-auth \
+            --client-id=$INFISICAL_CLIENT_ID \
+            --client-secret=$INFISICAL_CLIENT_SECRET \
+            --domain=$INFISICAL_API_URL \
+            --silent --plain)
+
+          # Build and tag the image
+          docker build \
+            --build-arg INFISICAL_ENV=$INFISICAL_ENV \
+            --build-arg INFISICAL_API_URL=$INFISICAL_API_URL \
+            --build-arg INFISICAL_PROJECT_ID=$INFISICAL_PROJECT_ID \
+            --build-arg INFISICAL_TOKEN=$INFISICAL_TOKEN \
+            -t $ECR_REPO:$IMAGE_TAG \
+            -t $ECR_REPO:latest .
+
+          # Tag for ECR
+          docker tag $ECR_REPO:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+          docker tag $ECR_REPO:latest $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO:latest
+
+
+          # Push to ECR
+          aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
+          docker push $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+          docker push $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$ECR_REPO:latest
+          
+
+
+
+      - name: Update ECS Task Definition
+        run: |
+          TASK_DEFINATION_FILE="dev-api-gassapp-td.json"
+          TASK_DEFINATION_FAMILY="dev-gasapp-api"
+          CPU="500"
+          MEMORY="1000"
+
+
+          echo "Adding latest tag in task-defination and updating CPU and MEMORY"
+          sed -i "s/$ECR_REPO:tag/$ECR_REPO:$IMAGE_TAG/" $TASK_DEFINATION_FILE
+          sed -i 's/"cpu": "[0-9]*"/"cpu": "'"$CPU"'"/' $TASK_DEFINATION_FILE
+          sed -i 's/"memory": "[0-9]*"/"memory": "'"$MEMORY"'"/' $TASK_DEFINATION_FILE
+
+
+          # Update task definition with new image
+          aws ecs register-task-definition \
+            --cli-input-json file://$TASK_DEFINATION_FILE \
+            --region $REGION
+
+          # Get latest task definition revision
+          latest_version=$(aws ecs describe-task-definition \
+            --task-definition $TASK_DEFINATION_FAMILY \
+            --region $REGION | jq .taskDefinition.revision)
+          
+          echo "Latest version is $latest_version"
+
+
+      - name: Deploy to ECS
+        run: |
+          # Check if service exists
+          ECS_SERVICES=$(aws ecs list-services --cluster $CLUSTER --output json --query "serviceArns" | jq -r '.[]' | awk -F'/' '{print $NF}')
+          if [ -z "$ECS_SERVICES" ]; then
+            ECS_SERVICES="dummy-service"
+          fi
+      
+          echo $ECS_SERVICES > services.txt
+      
+          if grep -F "$SERVICE" services.txt; then
+            echo "Service exists, updating..."
+            aws ecs update-service \
+              --cluster $CLUSTER \
+              --region $REGION \
+              --service $SERVICE \
+              --task-definition $TASK_DEFINATION_FAMILY:${latest_version}
+          else
+            echo "Service does not exist, creating new service..."
+      
+            # Create target group
+            echo "Creating target group..."
+            TARGET_GROUP_ARN=$(aws elbv2 create-target-group \
+              --name $TARGET_GROUP_NAME \
+              --protocol HTTP \
+              --port 80 \
+              --target-type instance \
+              --vpc-id $VPC_ID \
+              --health-check-path $HEALTH_CHECK_PATH_TG \
+              --query 'TargetGroups[0].TargetGroupArn' \
+              --output text)
+      
+            # Get highest priority number
+            aws elbv2 describe-rules \
+              --listener-arn $ALB_LISTENER_ARN \
+              --query 'Rules[].Priority' \
+              --output text | tr '\t' '\n' > priority.txt
+      
+            highest_number=$(sort -n priority.txt | tail -n 1)
+            NEW_PRIORITY=$((highest_number + 1))
+            rm -rf priority.txt
+      
+            # Create ALB rule
+            echo "Creating ALB rule..."
+            aws elbv2 create-rule \
+              --listener-arn $ALB_LISTENER_ARN \
+              --priority $NEW_PRIORITY \
+              --conditions Field=host-header,Values=["$HOST"] \
+              --actions Type=forward,TargetGroupArn=$TARGET_GROUP_ARN || { 
+                aws elbv2 delete-target-group --target-group-arn $TARGET_GROUP_ARN
+                exit 1
+              }
+      
+            # Get rule ARN
+            rule_arn=$(aws elbv2 describe-rules \
+              --listener-arn $ALB_LISTENER_ARN | jq -r '.Rules[] | select(.Conditions[]?.Field == "host-header" and .Conditions[]?.Values[] == "'"$HOST"'") | .RuleArn')
+      
+            # Create ECS service
+            echo "Creating ECS service..."
+            aws ecs create-service \
+              --cluster $CLUSTER \
+              --service-name $SERVICE \
+              --task-definition $TASK_DEFINATION_FAMILY:$latest_version \
+              --desired-count 1 \
+              --placement-strategy type="binpack",field="memory" \
+              --load-balancers targetGroupArn=$TARGET_GROUP_ARN,containerName=$ECS_CONTAINER_NAME,containerPort=5000 || {
+                aws elbv2 delete-rule --rule-arn $rule_arn
+                aws elbv2 delete-target-group --target-group-arn $TARGET_GROUP_ARN
+                exit 1
+              }
+          fi
+      
+          # Wait for service to stabilize
+          aws ecs wait services-stable \
+            --cluster $CLUSTER \
+            --region $REGION \
+            --services $SERVICE
+      
+          # Cleanup
+          rm -rf services.txt
+
+
+
+
+
+
+
+
+
+
+
