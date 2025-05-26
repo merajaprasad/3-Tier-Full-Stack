@@ -1,5 +1,5 @@
 {
-    "family": "yelp-camp-app",
+    "family": "yelp-camp-app-td",
     "taskRoleArn": "",
     "executionRoleArn": "arn:aws:iam::1234567890:role/ecsTaskExecutionRole",
     "containerDefinitions": [

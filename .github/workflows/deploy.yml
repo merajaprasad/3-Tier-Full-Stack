@@ -118,8 +118,8 @@ jobs:
 
       - name: Update ECS Task Definition
         run: |
-          TASK_DEFINATION_FILE="dev-api-gassapp-td.json"
-          TASK_DEFINATION_FAMILY="dev-gasapp-api"
+          TASK_DEFINATION_FILE="yelp-camp-app-td.json"
+          TASK_DEFINATION_FAMILY="yelp-camp-app-td"
           CPU="500"
           MEMORY="1000"
 
