@@ -76,7 +76,7 @@ jobs:
         run: |
           docker build \
             --load \
-            -f "${DOCKERFILE_PATH}}" \
+            -f "${DOCKERFILE_PATH}" \
             -t "yelp-camp:${BUILD_NUMBER}" .
 
 
