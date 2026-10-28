@@ -43,6 +43,15 @@ jobs:
           chmod +x /tmp/gitleaks
           /tmp/gitleaks detect --source . --redact --exit-code 0 --verbose
 
+      - name: Get GitHub Repository and OIDC
+        run: |
+          TOKEN=$(curl -sSf \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r '.value')
+
+          echo "OIDC token retrieved successfully"
+          echo "Token is present: $([[ -n "$TOKEN" ]] && echo yes || echo no)"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
