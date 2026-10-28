@@ -19,6 +19,18 @@ permissions:
   contents: read
 
 
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-24.04
+    environment: dev
+
+    steps:
+      - name: Initialize Pipeline
+        run: echo "pipeline started"
+        
+
+
 
 
 
