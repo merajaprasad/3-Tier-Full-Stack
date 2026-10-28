@@ -71,11 +71,13 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker Images
-        env: BUILD_NUMBER: ${{ github.run_number }}
+        env: 
+          BUILD_NUMBER: ${{ github.run_number }}
         run: |
           docker build \
             --load \
-            -f "${DOCKERFILE_PATH}}" .
+            -f "${DOCKERFILE_PATH}}" \
+            -t "yelp-camp:${BUILD_NUMBER}" .
 
 
 
