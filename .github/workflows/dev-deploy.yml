@@ -29,8 +29,8 @@ jobs:
       - name: Initialize Pipeline
         run: echo "pipeline started"
 
-      - name: Checkout Code
-        uses: actions/checkout@4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Gitleaks Secret Scan
         run: |
@@ -38,7 +38,14 @@ jobs:
             | tar -xz -C /tmp gitleaks
           chmod +x /tmp/gitleaks
           /tmp/gitleaks detect --source . --redact --exit-code 0 --verbose
-          
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-yelp-camp-dev-${{ github.run_id }}
+
 
 
 
