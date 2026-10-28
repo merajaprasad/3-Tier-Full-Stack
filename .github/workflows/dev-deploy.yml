@@ -1,0 +1,26 @@
+name: Dev Deploy to ECS
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - '**'
+      - '.github/workflows/dev-deploy.yml'
+      - 'Dockerfile.main'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-yelp-camp-dev
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+
+
+
+
+
+
