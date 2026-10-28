@@ -28,7 +28,18 @@ jobs:
     steps:
       - name: Initialize Pipeline
         run: echo "pipeline started"
-        
+
+      - name: Checkout Code
+        uses: actions/checkout@4
+
+      - name: Gitleaks Secret Scan
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
+            | tar -xz -C /tmp gitleaks
+          chmod +x /tmp/gitleaks
+          /tmp/gitleaks detect --source . --redact --exit-code 0 --verbose
+          
+
 
 
 
