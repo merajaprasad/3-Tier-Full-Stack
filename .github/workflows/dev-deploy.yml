@@ -22,6 +22,7 @@ env:
   AWS_REGION: ap-south-1
   ACCOUNT_ID: "075810104695"
   AWS_DEPLOY_ROLE_ARN: arn:aws:iam::075810104695:role/github-action-yelp-camp-dev-deploy-oidc-role
+  DOCKERFILE_PATH: Dockerfile.main
 
 jobs:
   deploy:
@@ -65,6 +66,18 @@ jobs:
           role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: gha-yelp-camp-dev-${{ github.run_id }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Images
+        env: BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          docker build \
+            --load \
+            -f "${DOCKERFILE_PATH}}" .
+
+
 
 
 
