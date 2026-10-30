@@ -24,12 +24,12 @@ jobs:
     runs-on: ubuntu-24.04
     environment: dev
 
-  steps:
-    - name: Initialize Pipeline
-      run: echo "Pipeline Started"
-    
-    - name: Checkout Repository
-      uses: actions/checkout@v5
+    steps:
+      - name: Initialize Pipeline
+        run: echo "Pipeline Started"
+      
+      - name: Checkout Repository
+        uses: actions/checkout@v5
 
 
 
