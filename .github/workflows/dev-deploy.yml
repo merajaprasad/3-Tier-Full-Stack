@@ -1,4 +1,4 @@
-name: Dev Deploy to ECS
+name: yelp camp deploy into ECS
 
 on:
   push:
@@ -7,89 +7,33 @@ on:
     paths:
       - '**'
       - '.github/workflows/dev-deploy.yml'
-      - 'Dockerfile.main'
   workflow_dispatch:
 
 concurrency:
-  group: deploy-yelp-camp-dev
+  group: yelp-camp-deploy-dev
   cancel-in-progress: false
 
 permissions:
   id-token: write
-  contents: read
+  contents: read  
 
 env:
-  AWS_REGION: ap-south-1
-  ACCOUNT_ID: "075810104695"
-  AWS_DEPLOY_ROLE_ARN: arn:aws:iam::075810104695:role/github-action-yelp-camp-dev-deploy-oidc-role
-  DOCKERFILE_PATH: Dockerfile.main
+
+
+
 
 jobs:
   deploy:
-    name: Build and Deploy
-    runs-on: ubuntu-24.04
+    name: Build & Deploy
+    runs-on: ubuntu-24.02
     environment: dev
 
-    steps:
-      - name: Initialize Pipeline
-        run: echo "pipeline started"
-
-      - name: Checkout Repository
-        uses: actions/checkout@v5
-
-      - name: Gitleaks Secret Scan
-        run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz \
-            | tar -xz -C /tmp gitleaks
-          chmod +x /tmp/gitleaks
-          /tmp/gitleaks detect --source . --redact --exit-code 0 --verbose
-
-      - name: Debug GitHub OIDC Claims
-        run: |
-          TOKEN=$(curl -sSf \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com" | jq -r '.value')
-
-          echo "$TOKEN" | cut -d '.' -f 2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq '{
-            sub,
-            aud,
-            repository,
-            repository_id,
-            repository_owner,
-            repository_owner_id,
-            environment
-          }'
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: gha-yelp-camp-dev-${{ github.run_id }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker Images
-        env: 
-          BUILD_NUMBER: ${{ github.run_number }}
-        run: |
-          docker build \
-            --load \
-            -f "${DOCKERFILE_PATH}" \
-            -t "yelp-camp:${BUILD_NUMBER}" .
-
-          docker images
-
-
-
-
-
-
-
-
-
-
+  steps:
+    - name: Initialize Pipeline
+      run: echo "Pipeline Started"
+    
+    - name: Checkout Repository
+      uses: actions/checkout@v5
 
 
 
