@@ -42,11 +42,14 @@ jobs:
           /tmp/gitleaks detect --source . --redact --exit-code 0 --verbose
 
       - name: Configure Aws Credentials
-        uses: aws-actions/
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
           role-session-name: yelp-camp-deploy-${{ github.run_id }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       
 
